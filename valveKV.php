@@ -25,7 +25,7 @@
 
         public function __construct($str) {
             $this->index = 0;
-            $this->stream = $str;
+            $this->stream = $str.PHP_EOL;
             $this->streamlen = strlen($str);
             $this->next = $this->stream[$this->index];
 
@@ -95,6 +95,10 @@
         private function nextChar($expected = null, $ignore = true) {
 
             $current = $this->next;
+
+            if ($this->index == $this->streamlen) {
+                throw new Exception("Unexpected EOF (end-of-file) at line ".$this->line.", column ".($this->index - $this->lineStart).".");
+            }
 
             if ($expected && $current != $expected) {
                 throw new Exception("Unexpected character '".$current."', expected '".$expected."' at line ".$this->line.", column ".($this->index - $this->lineStart).".");
