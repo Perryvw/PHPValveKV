@@ -23,27 +23,91 @@
         private $line;
         private $lineStart;
 
-        public function __construct($str) {
-            $this->index = 0;
+        public function __construct() {
+        }
+
+        public function parseFromString($str) {
+            $this->path = "./";
+            return $this->initialise($str);
+        }
+
+        public function parseFromFile($path) {
+            if (file_exists($path)) {
+                // Get path for bases
+                $path = str_replace("\\", "/", $path);
+                if (strpos($path, "/") !== false) {
+                    $this->path = substr($path, 0, strrpos($path, "/") + 1);
+                } else {
+                    $this->path = "./";
+                }
+                $str = file_get_contents($path);
+                return $this->initialise($str);
+            } else {
+                throw new Exception("Could not find a file at path '".$path."'.");
+            }
+        }
+
+        private function initialise($str) {
+            $this->index = -1;
             $this->stream = $str.PHP_EOL;
             $this->streamlen = strlen($str);
-            $this->next = $this->stream[$this->index];
 
+            // Get first char
+            $this->nextChar();
+
+            // Keep track of line for error messages
             $this->line = 1;
             $this->lineStart = 0;
+
+            return $this->parseKV();
         }
 
         // Parse a complete KV string.
-        public function parse() {
-            while ($this->next !== "{") {
-                $this->nextChar();
+        private function parseKV() {
+            // Parse bases
+            $bases = [];
+            while ($this->next == "#") {
+                array_push($bases, $this->parseBase());
             }
 
-            $obj = $this->parseObject();
+            $root = [];
 
-            $this->result = $obj;
+            // Check if this file contains a root object
+            if ($this->index < $this->streamlen) {
+                // Parse root name
+                $name = $this->parseString();
 
-            return $obj;
+                // Parse root
+                $root = $this->parseObject();
+            }
+
+            // Add bases to root
+            foreach ($bases as $path => $base) {
+                foreach ($base as $key => $value) {
+                    if (!array_key_exists($key, $root)) {
+                        $root[$key] = $value;
+                    } else {
+                        throw new Exception("Key collision!");
+                    }
+                }
+            }
+
+            $this->result = $root;
+
+            return $root;
+        }
+
+        private function parseBase() {
+            $this->nextChar("#");
+            $this->nextChar("b");
+            $this->nextChar("a");
+            $this->nextChar("s");
+            $this->nextChar("e");
+            
+            $path = $this->parseString();
+
+            $parser = new ValveKV();
+            return $parser->parseFromFile($this->path.$path);
         }
 
         // Parse a single object.
@@ -171,4 +235,3 @@
 
         }
     }
-?>
