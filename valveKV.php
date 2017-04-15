@@ -27,6 +27,7 @@
         }
 
         public function parseFromString($str) {
+            $this->fullPath = "./";
             $this->path = "./";
             return $this->initialise($str);
         }
@@ -34,6 +35,7 @@
         public function parseFromFile($path) {
             if (file_exists($path)) {
                 // Get path for bases
+                $this->fullPath = $path;
                 $path = str_replace("\\", "/", $path);
                 if (strpos($path, "/") !== false) {
                     $this->path = substr($path, 0, strrpos($path, "/") + 1);
@@ -67,7 +69,9 @@
             // Parse bases
             $bases = [];
             while ($this->next == "#") {
-                array_push($bases, $this->parseBase());
+                $path = $this->parseBase();
+                $parser = new ValveKV();
+                $bases[$path] = $parser->parseFromFile($this->path.$path);
             }
 
             $root = [];
@@ -87,7 +91,7 @@
                     if (!array_key_exists($key, $root)) {
                         $root[$key] = $value;
                     } else {
-                        throw new Exception("Key collision!");
+                        throw new KeyCollisionException($key, $this->fullPath, $this->path.$path);
                     }
                 }
             }
@@ -104,10 +108,7 @@
             $this->nextChar("s");
             $this->nextChar("e");
             
-            $path = $this->parseString();
-
-            $parser = new ValveKV();
-            return $parser->parseFromFile($this->path.$path);
+            return $this->parseString();
         }
 
         // Parse a single object.
@@ -161,11 +162,11 @@
             $current = $this->next;
 
             if ($this->index == $this->streamlen) {
-                throw new Exception("Unexpected EOF (end-of-file) at line ".$this->line.", column ".($this->index - $this->lineStart).".");
+                throw new ParseException("Unexpected EOF (end-of-file).", $this->line, $this->index - $this->lineStart);
             }
 
             if ($expected && $current != $expected) {
-                throw new Exception("Unexpected character '".$current."', expected '".$expected."' at line ".$this->line.", column ".($this->index - $this->lineStart).".");
+                throw new ParseException("Unexpected character '".$current."', expected '".$expected.".", $this->line, $this->index - $this->lineStart);
             }
 
             $this->index++;
@@ -181,7 +182,7 @@
                         } else if ($c2 == "*") {
                             $this->ignoreMLComment();
                         } else {
-                            throw new Exception("Malformed comment found.");
+                            throw new ParseException("Malformed comment found.", $this->line, $this->index - $this->lineStart);
                         }
                         $this->index++;
                         $c = $this->stream[$this->index];
@@ -233,5 +234,21 @@
                 }
             }
 
+        }
+    }
+
+    class ParseException extends Exception {
+        // Redefine consructor
+        public function __construct($message, $line, $column) {
+            // Super
+            parent::__construct($message." Line: ".$line."; Column: ".$column.".");
+        }
+    }
+
+    class KeyCollisionException extends Exception {
+        // Redefine consructor
+        public function __construct($key, $file1, $file2) {
+            // Super
+            parent::__construct("Key collision on key '".$key."'"." Path 1: '".$file1."'; File 2: '".$file2."'.");
         }
     }
