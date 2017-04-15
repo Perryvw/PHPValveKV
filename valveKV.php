@@ -162,11 +162,11 @@
             $current = $this->next;
 
             if ($this->index == $this->streamlen) {
-                throw new ParseException("Unexpected EOF (end-of-file).", $this->line, $this->index - $this->lineStart);
+                throw new ParseException("Unexpected EOF (end-of-file).", $this->line, $this->index - $this->lineStart + 1);
             }
 
             if ($expected && $current != $expected) {
-                throw new ParseException("Unexpected character '".$current."', expected '".$expected.".", $this->line, $this->index - $this->lineStart);
+                throw new ParseException("Unexpected character '".$current."', expected '".$expected.".", $this->line, $this->index - $this->lineStart + 1);
             }
 
             $this->index++;
@@ -182,7 +182,7 @@
                         } else if ($c2 == "*") {
                             $this->ignoreMLComment();
                         } else {
-                            throw new ParseException("Malformed comment found.", $this->line, $this->index - $this->lineStart);
+                            throw new ParseException("Malformed comment found.", $this->line, $this->index - $this->lineStart + 1);
                         }
                         $this->index++;
                         $c = $this->stream[$this->index];
