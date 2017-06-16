@@ -41,7 +41,7 @@
                 $str = file_get_contents($path);
                 return $this->initialise($str);
             } else {
-                throw new Exception("Could not find a file at path '".$path."'.");
+                throw new \Exception("Could not find a file at path '".$path."'.");
             }
         }
 
