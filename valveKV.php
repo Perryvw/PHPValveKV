@@ -9,9 +9,9 @@
      *
      * The result is stored in $parser->result;
      */
-    class ValveKV {
+    namespace ValveKV;
 
-        const IGNORE = " \t\r\n";
+    class ValveKV {
 
         public  $result;
 
@@ -50,9 +50,20 @@
         }
 
         private function initialise($str) {
+            // detect and convert utf-16, utf-32 and convert to utf8
+            if      (substr($str, 0, 2) === "\xFE\xFF")         $str = mb_convert_encoding($str, 'UTF-8', 'UTF-16BE');
+            else if (substr($str, 0, 2) === "\xFF\xFE")         $str = mb_convert_encoding($str, 'UTF-8', 'UTF-16LE');
+            else if (substr($str, 0, 4) === "\x00\x00\xFE\xFF") $str = mb_convert_encoding($str, 'UTF-8', 'UTF-32BE');
+            else if (substr($str, 0, 4) === "\xFF\xFE\x00\x00") $str = mb_convert_encoding($str, 'UTF-8', 'UTF-32LE');
+            
+            // Strip header
+            $str = preg_replace('/^[\xef\xbb\xbf\xff\xfe\xfe\xff]*/', '', $str);
+
             $this->index = -1;
             $this->stream = $str.PHP_EOL;
             $this->streamlen = strlen($str);
+
+            unset($str);
 
             // Get first char
             $this->nextChar();
@@ -68,7 +79,7 @@
         private function parseKV() {
             // Parse bases
             $bases = [];
-            while ($this->next == "#") {
+            while ($this->next === "#") {
                 $path = $this->parseBase();
                 $parser = new ValveKV();
                 $bases[$path] = $parser->parseFromFile($this->path.$path);
@@ -79,10 +90,10 @@
             // Check if this file contains a root object
             if ($this->index < $this->streamlen) {
                 // Parse root name
-                $name = $this->parseString();
+                $name = $this->next === "\"" ? $this->parseString() : $this->parseQuotelessString();
 
                 // Parse root
-                $root = $this->parseObject();
+                $root[$name] = $this->parseObject();
             }
 
             // Add bases to root
@@ -118,10 +129,19 @@
             $properties = array();
 
             while ($this->next != "}") {
-                $key = $this->parseString();
+                // Read key, if it does not start with " read quoteless
+                $key = $this->next === "\"" ? $this->parseString() : $this->parseQuotelessString();
                 $val = $this->parseValue();
 
-                $properties[$key] = $val;
+                if ($this->next === "[") {
+                    $this->ignoreConditional();
+                }
+
+                if (isset($properties[$key])) {
+                    $properties = array_replace_recursive($properties, [$key => $val]);
+                } else {
+                    $properties[$key] = $val;
+                }
             }
 
             $this->nextChar("}");
@@ -131,26 +151,48 @@
 
         // Parse a value, either a string or an object.
         private function parseValue() {
-            if ($this->next == "\"") {
+            if ($this->next === "\"") {
                 return $this->parseString();
             }
-            else if ($this->next == "{") {
+            else if ($this->next === "{") {
                 return $this->parseObject();
             }
         }
 
         // Parse a string.
         private function parseString() {
-            $this->nextChar("\"");
+            $this->nextChar("\"", false);
 
-            $str = "";
-            while ($this->next != "\"") {
-                $str .= $this->nextChar(null, false);
-            }
+            // Find next quote
+            $endPos = $this->index - 1;
+            do {
+                $endPos = strpos($this->stream, "\"", $endPos + 1);
+            } while ($this->stream[$endPos-1] === "\\");
+
+            //Extract string
+            $str = substr($this->stream, $this->index, $endPos - $this->index);
+
+            // Set index
+            $this->index = $endPos;
+            $this->next = $this->stream[$this->index];
+
+            $this->line += substr_count($str, "\n");
 
             $this->nextChar("\"");
 
             return $str;
+        }
+
+        private function parseQuotelessString() {
+            $start = $this->index;
+            $end = $start;
+
+            while ($this->next !== " " && $this->next !== "\t" && $this->next !== "\r" && $this->next !== "\n") {
+                $this->index++;
+                $this->next = $this->stream[$this->index];
+            }
+
+            return substr($this->stream, $start, $end);
         }
 
         // Get the next character, allows an expected value. If the next character does not
@@ -161,7 +203,7 @@
 
             $current = $this->next;
 
-            if ($this->index == $this->streamlen) {
+            if ($this->index === $this->streamlen) {
                 throw new ParseException("Unexpected EOF (end-of-file).", $this->line, $this->index - $this->lineStart + 1);
             }
 
@@ -174,32 +216,43 @@
 
             if ($ignore) {
                 // Ignore whitespace
-                while ((strpos(self::IGNORE, $c) !== false || $c == "/") && $this->index < $this->streamlen - 1) {
-                    if ($c == "/") {
+                while (($c === " " || $c === "\t" || $c === "\r" || $c === "\n" || $c === "/") && $this->index < $this->streamlen - 1) {
+                    if ($c === "/") {
                         $c2 = $this->stream[$this->index + 1];
-                        if ($c2 == "/") {
-                            $this->ignoreSLComment();
-                        } else if ($c2 == "*") {
+                        // Although Valve uses the double-slash convention, the KV spec allows for single-slash comments.
+                        if ($c2 === "*") {
                             $this->ignoreMLComment();
                         } else {
-                            throw new ParseException("Malformed comment found.", $this->line, $this->index - $this->lineStart + 1);
+                            $this->ignoreSLComment();
                         }
-                        $this->index++;
-                        $c = $this->stream[$this->index];
-                    } else {
-                        if ($c == "\n") {
-                            $this->line++;
-                            $this->lineStart = $this->index;
-                        }
-                        $this->index++;
-                        $c = $this->stream[$this->index];
+                    } else if ($c === "\n") {
+                        $this->line++;
+                        $this->lineStart = $this->index;
                     }
+
+                    $this->index++;
+                    $c = $this->stream[$this->index];
                 }
             }
 
             $this->next = $this->stream[$this->index];
 
             return $current;
+        }
+
+        private function skipWhitespace() {
+            
+        }
+
+        private function ignoreConditional() {
+            $this->nextChar("[");
+
+            $end = strpos($this->stream, "]", $this->index);
+
+            $this->index = $end;
+            $this->next = $this->stream[$this->index];
+
+            $this->nextChar("]");
         }
 
         // Advance the read index until after the single line comment
@@ -211,7 +264,8 @@
                 $this->index++;
                 $c = $this->stream[$this->index];
             }
-
+            $this->line++;
+            $this->lineStart = $this->index;
         }
 
         // Advance read index until after the multi-line comment
@@ -228,16 +282,15 @@
                 $this->index++;
                 $c = $this->stream[$this->index];
 
-                if ($c == "/") {
+                if ($c === "/") {
                     $this->index++;
                     break;
                 }
             }
-
         }
     }
 
-    class ParseException extends Exception {
+    class ParseException extends \Exception {
         // Redefine consructor
         public function __construct($message, $line, $column) {
             // Super
@@ -245,7 +298,7 @@
         }
     }
 
-    class KeyCollisionException extends Exception {
+    class KeyCollisionException extends \Exception {
         // Redefine consructor
         public function __construct($key, $file1, $file2) {
             // Super
