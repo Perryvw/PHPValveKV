@@ -92,6 +92,9 @@
                 // Parse root name
                 $name = $this->next === "\"" ? $this->parseString() : $this->parseQuotelessString();
 
+                // Skip whitespace
+                $this->skipWhitespace();
+
                 // Parse root
                 $root[$name] = $this->parseObject();
             }
@@ -128,20 +131,26 @@
 
             $properties = array();
 
+            // Skip whitespace
+            $this->skipWhitespace();
+
             while ($this->next != "}") {
                 // Read key, if it does not start with " read quoteless
                 $key = $this->next === "\"" ? $this->parseString() : $this->parseQuotelessString();
+
+                // Skip whitespace after key
+                $this->skipWhitespace();
+
+                // Read value
                 $val = $this->parseValue();
-
-                if ($this->next === "[") {
-                    $this->ignoreConditional();
-                }
-
                 if (isset($properties[$key])) {
                     $properties = array_replace_recursive($properties, [$key => $val]);
                 } else {
                     $properties[$key] = $val;
                 }
+
+                // Skip whitespace
+                $this->skipWhitespace();
             }
 
             $this->nextChar("}");
@@ -156,12 +165,14 @@
             }
             else if ($this->next === "{") {
                 return $this->parseObject();
+            } else {
+                return $this->parseQuotelessString();
             }
         }
 
         // Parse a string.
         private function parseString() {
-            $this->nextChar("\"", false);
+            $this->nextChar("\"");
 
             // Find next quote
             $endPos = $this->index - 1;
@@ -185,21 +196,21 @@
 
         private function parseQuotelessString() {
             $start = $this->index;
-            $end = $start;
 
             while ($this->next !== " " && $this->next !== "\t" && $this->next !== "\r" && $this->next !== "\n") {
+
                 $this->index++;
                 $this->next = $this->stream[$this->index];
             }
 
-            return substr($this->stream, $start, $end);
+            return substr($this->stream, $start, $this->index - $start);
         }
 
         // Get the next character, allows an expected value. If the next character does not
         // match the expected character throws an error. Ignores whitespace and comments by default
         // the $ignore parameter can be set to false to read comments and whitespace (for example for
         // reading inside strings).
-        private function nextChar($expected = null, $ignore = true) {
+        private function nextChar($expected = null) {
 
             $current = $this->next;
 
@@ -212,36 +223,41 @@
             }
 
             $this->index++;
-            $c = $this->stream[$this->index];
-
-            if ($ignore) {
-                // Ignore whitespace
-                while (($c === " " || $c === "\t" || $c === "\r" || $c === "\n" || $c === "/") && $this->index < $this->streamlen - 1) {
-                    if ($c === "/") {
-                        $c2 = $this->stream[$this->index + 1];
-                        // Although Valve uses the double-slash convention, the KV spec allows for single-slash comments.
-                        if ($c2 === "*") {
-                            $this->ignoreMLComment();
-                        } else {
-                            $this->ignoreSLComment();
-                        }
-                    } else if ($c === "\n") {
-                        $this->line++;
-                        $this->lineStart = $this->index;
-                    }
-
-                    $this->index++;
-                    $c = $this->stream[$this->index];
-                }
-            }
-
             $this->next = $this->stream[$this->index];
 
             return $current;
         }
 
         private function skipWhitespace() {
-            
+            // Read next character
+            $c = $this->stream[$this->index];
+
+            // Ignore whitespace
+            while (($c === " " || $c === "\t" || $c === "\r" || $c === "\n" || $c === "/" || $c == "[") && $this->index < $this->streamlen - 1) {
+                if ($c === "/") {
+                    // Look ahead one more
+                    $c2 = $this->stream[$this->index + 1];
+                    // Although Valve uses the double-slash convention, the KV spec allows for single-slash comments.
+                    if ($c2 === "*") {
+                        $this->ignoreMLComment();
+                    } else {
+                        $this->ignoreSLComment();
+                    }
+                } else if ($c == "[") {
+                    $this->next = $c;
+                    $this->ignoreConditional();
+                } else if ($c === "\n") {
+                    // Increase line count
+                    $this->line++;
+                    $this->lineStart = $this->index;
+                }
+
+                // Increment position
+                $this->index++;
+                $c = $this->stream[$this->index];
+            }
+
+            $this->next = $this->stream[$this->index];
         }
 
         private function ignoreConditional() {
