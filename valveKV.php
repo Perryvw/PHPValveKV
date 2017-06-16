@@ -6,14 +6,10 @@
      * Example usage:
      * $parser = new ValveKV($kvString);
      * $kv = $parser->parse();
-     *
-     * The result is stored in $parser->result;
      */
     namespace ValveKV;
 
     class ValveKV {
-
-        public  $result;
 
         private $index;
         private $stream;
@@ -50,27 +46,27 @@
         }
 
         private function initialise($str) {
-            // detect and convert utf-16, utf-32 and convert to utf8
-            if      (substr($str, 0, 2) === "\xFE\xFF")         $str = mb_convert_encoding($str, 'UTF-8', 'UTF-16BE');
-            else if (substr($str, 0, 2) === "\xFF\xFE")         $str = mb_convert_encoding($str, 'UTF-8', 'UTF-16LE');
-            else if (substr($str, 0, 4) === "\x00\x00\xFE\xFF") $str = mb_convert_encoding($str, 'UTF-8', 'UTF-32BE');
-            else if (substr($str, 0, 4) === "\xFF\xFE\x00\x00") $str = mb_convert_encoding($str, 'UTF-8', 'UTF-32LE');
-            
-            // Strip header
-            $str = preg_replace('/^[\xef\xbb\xbf\xff\xfe\xfe\xff]*/', '', $str);
-
-            $this->index = -1;
-            $this->stream = $str.PHP_EOL;
-            $this->streamlen = strlen($str);
-
+            $this->stream = $str;
             unset($str);
 
-            // Get first char
-            $this->nextChar();
+            // detect and convert utf-16, utf-32 and convert to utf8
+            if      (substr($this->stream, 0, 2) === "\xFE\xFF")         $this->stream = mb_convert_encoding($this->stream, 'UTF-8', 'UTF-16BE');
+            else if (substr($this->stream, 0, 2) === "\xFF\xFE")         $this->stream = mb_convert_encoding($this->stream, 'UTF-8', 'UTF-16LE');
+            else if (substr($this->stream, 0, 4) === "\x00\x00\xFE\xFF") $this->stream = mb_convert_encoding($this->stream, 'UTF-8', 'UTF-32BE');
+            else if (substr($this->stream, 0, 4) === "\xFF\xFE\x00\x00") $this->stream = mb_convert_encoding($this->stream, 'UTF-8', 'UTF-32LE');
+
+            // Strip BOM header
+            $this->stream = preg_replace('/^[\xef\xbb\xbf\xff\xfe\xfe\xff]*/', '', $this->stream);
+
+            $this->streamlen = strlen($this->stream);
+            $this->index = 0;
+            $this->next = $this->stream[0];
 
             // Keep track of line for error messages
             $this->line = 1;
             $this->lineStart = 0;
+
+            $this->skipWhitespace();
 
             return $this->parseKV();
         }
@@ -110,8 +106,6 @@
                 }
             }
 
-            $this->result = $root;
-
             return $root;
         }
 
@@ -134,7 +128,7 @@
             // Skip whitespace
             $this->skipWhitespace();
 
-            while ($this->next != "}") {
+            while ($this->next !== "}") {
                 // Read key, if it does not start with " read quoteless
                 $key = $this->next === "\"" ? $this->parseString() : $this->parseQuotelessString();
 
@@ -148,7 +142,6 @@
                 } else {
                     $properties[$key] = $val;
                 }
-
                 // Skip whitespace
                 $this->skipWhitespace();
             }
@@ -176,9 +169,27 @@
 
             // Find next quote
             $endPos = $this->index - 1;
-            do {
+            while ($endPos !== -1) {
                 $endPos = strpos($this->stream, "\"", $endPos + 1);
-            } while ($this->stream[$endPos-1] === "\\");
+
+                if ($endPos === false) {
+                    throw new ParseException("Missing ending quote for string.", $this->line, $this->index - $this->lineStart + 1);
+                }
+
+                // Count backslashes before closing quote
+                $index = 0;
+                $prevChar = $this->stream[$endPos - $index - 1];
+                while ($prevChar === "\\") {
+                    $index++;
+                    $prevChar = $this->stream[$endPos - $index - 1];
+                }
+
+                // If there is an even number of backslashes before the quote break the loop
+                // Otherwise, continue
+                if ($index % 2 === 0) {
+                    break;
+                }
+            }
 
             //Extract string
             $str = substr($this->stream, $this->index, $endPos - $this->index);
@@ -187,7 +198,7 @@
             $this->index = $endPos;
             $this->next = $this->stream[$this->index];
 
-            $this->line += substr_count($str, "\n");
+            //$this->line += substr_count($str, "\n");
 
             $this->nextChar("\"");
 
@@ -199,42 +210,51 @@
 
             while ($this->next !== " " && $this->next !== "\t" && $this->next !== "\r" && $this->next !== "\n") {
 
-                $this->index++;
-                $this->next = $this->stream[$this->index];
+                $this->step();
             }
 
             return substr($this->stream, $start, $this->index - $start);
         }
 
         // Get the next character, allows an expected value. If the next character does not
-        // match the expected character throws an error. Ignores whitespace and comments by default
-        // the $ignore parameter can be set to false to read comments and whitespace (for example for
-        // reading inside strings).
+        // match the expected character throws an error.
         private function nextChar($expected = null) {
 
             $current = $this->next;
 
-            if ($this->index === $this->streamlen) {
+            if ($current === false) {
                 throw new ParseException("Unexpected EOF (end-of-file).", $this->line, $this->index - $this->lineStart + 1);
             }
 
-            if ($expected && $current != $expected) {
+            if ($expected && $current !== $expected) {
                 throw new ParseException("Unexpected character '".$current."', expected '".$expected.".", $this->line, $this->index - $this->lineStart + 1);
             }
 
-            $this->index++;
-            $this->next = $this->stream[$this->index];
+            $this->step();
 
             return $current;
         }
 
-        private function skipWhitespace() {
-            // Read next character
-            $c = $this->stream[$this->index];
+        // Step forward through the stream
+        private function step($steps = 1) {
+            // Do not allow stepping from beyond the end of the stream
+            if ($this->index >= $this->streamlen) {
+                echo $this->index."/".$this->streamlen."<br>";
+                throw new ParseException("Unexpected EOF (end-of-file).", $this->line, $this->index - $this->lineStart + 1);
+            }
+            $this->index += $steps;
 
+            if ($this->index >= $this->streamlen) {
+                $this->next = false;
+            } else {
+                $this->next = $this->stream[$this->index];
+            }            
+        }
+
+        private function skipWhitespace() {
             // Ignore whitespace
-            while (($c === " " || $c === "\t" || $c === "\r" || $c === "\n" || $c === "/" || $c == "[") && $this->index < $this->streamlen - 1) {
-                if ($c === "/") {
+            while ($this->next === " " || $this->next === "\t" || $this->next === "\r" || $this->next === "\n" || $this->next === "/" || $this->next === "[") {
+                if ($this->next === "/") {
                     // Look ahead one more
                     $c2 = $this->stream[$this->index + 1];
                     // Although Valve uses the double-slash convention, the KV spec allows for single-slash comments.
@@ -243,27 +263,27 @@
                     } else {
                         $this->ignoreSLComment();
                     }
-                } else if ($c == "[") {
-                    $this->next = $c;
+                } else if ($this->next === "[") {
                     $this->ignoreConditional();
-                } else if ($c === "\n") {
+                } else if ($this->next === "\n") {
                     // Increase line count
                     $this->line++;
                     $this->lineStart = $this->index;
                 }
 
                 // Increment position
-                $this->index++;
-                $c = $this->stream[$this->index];
+                $this->step();
             }
-
-            $this->next = $this->stream[$this->index];
         }
 
         private function ignoreConditional() {
             $this->nextChar("[");
 
             $end = strpos($this->stream, "]", $this->index);
+
+            if ($end === false) {
+                throw new ParseException("Missing ending ] for conditional.", $this->line, $this->index - $this->lineStart + 1);
+            }
 
             $this->index = $end;
             $this->next = $this->stream[$this->index];
@@ -273,33 +293,26 @@
 
         // Advance the read index until after the single line comment
         private function ignoreSLComment() {
-            $this->index++;
-            $c = $this->stream[$this->index];
+            $this->step();
 
-            while($c !== "\n") {
-                $this->index++;
-                $c = $this->stream[$this->index];
+            while($this->next !== "\n") {
+                $this->step();
             }
-            $this->line++;
-            $this->lineStart = $this->index;
         }
 
         // Advance read index until after the multi-line comment
         private function ignoreMLComment() {
-            $this->index++;
-            $c = $this->stream[$this->index];
+            $this->step();
 
             while (true) {
-                while($c !== "*") {
-                    $this->index++;
-                    $c = $this->stream[$this->index];
+                while($this->next !== "*") {
+                    $this->step();
                 }
 
-                $this->index++;
-                $c = $this->stream[$this->index];
+                $this->step();
 
                 if ($c === "/") {
-                    $this->index++;
+                    $this->step();
                     break;
                 }
             }
