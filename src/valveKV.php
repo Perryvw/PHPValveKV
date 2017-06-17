@@ -77,6 +77,7 @@
             $bases = [];
             while ($this->next === "#") {
                 $path = $this->parseBase();
+                $this->skipWhitespace();
                 $parser = new ValveKV();
                 $bases[$path] = $parser->parseFromFile($this->path.$path);
             }
@@ -84,7 +85,7 @@
             $root = [];
 
             // Check if this file contains a root object
-            if ($this->index < $this->streamlen) {
+            while ($this->next !== false) {
                 // Parse root name
                 $name = $this->next === "\"" ? $this->parseString() : $this->parseQuotelessString();
 
@@ -93,13 +94,25 @@
 
                 // Parse root
                 $root[$name] = $this->parseObject();
+
+                // Skip trailing whitespace
+                $this->skipWhitespace();
             }
+
+            // Get first key in $root
+            reset($root);
+            $firstRoot = key($root);
 
             // Add bases to root
             foreach ($bases as $path => $base) {
-                foreach ($base as $key => $value) {
+                // Get first root in base
+                reset($base);
+                $firstBaseRoot = $base[key($base)];
+
+                // Merge
+                foreach ($firstBaseRoot as $key => $value) {
                     if (!array_key_exists($key, $root)) {
-                        $root[$key] = $value;
+                        $root[$firstRoot][$key] = $value;
                     } else {
                         throw new KeyCollisionException($key, $this->fullPath, $this->path.$path);
                     }
@@ -115,6 +128,8 @@
             $this->nextChar("a");
             $this->nextChar("s");
             $this->nextChar("e");
+
+            $this->skipWhitespace();
             
             return $this->parseString();
         }
@@ -208,8 +223,7 @@
         private function parseQuotelessString() {
             $start = $this->index;
 
-            while ($this->next !== " " && $this->next !== "\t" && $this->next !== "\r" && $this->next !== "\n") {
-
+            while ($this->next !== " " && $this->next !== "\t" && $this->next !== "\r" && $this->next !== "\n" && $this->next !== false) {
                 $this->step();
             }
 
@@ -239,7 +253,6 @@
         private function step($steps = 1) {
             // Do not allow stepping from beyond the end of the stream
             if ($this->index >= $this->streamlen) {
-                echo $this->index."/".$this->streamlen."<br>";
                 throw new ParseException("Unexpected EOF (end-of-file).", $this->line, $this->index - $this->lineStart + 1);
             }
             $this->index += $steps;
@@ -295,8 +308,14 @@
         private function ignoreSLComment() {
             $this->step();
 
-            while($this->next !== "\n") {
-                $this->step();
+            $end = strpos($this->stream, "\n", $this->index);
+
+            if ($end === false) {
+                $this->index = $this->streamlen-1;
+                $this->next = false;
+            } else {
+                $this->index = $end;
+                $this->next = $this->stream[$this->index];
             }
         }
 
