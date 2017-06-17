@@ -4,6 +4,9 @@
 
 	define("PRINT_ERRORS", true);
 
+	$totalNum = 0;
+	$totalPass = 0;
+
 	// Basic tests to run
 	$tests = [
 		"basic.kv" => ["A" => ["B" => "C"]],
@@ -22,6 +25,7 @@
 	$pass = 0;
 	echo "Running functionality tests...<br>";
 	foreach ($tests as $file => $expected) {
+		echo "Testing ".$file."<br>";
 		// Create new parser
 		$parser = new ValveKV();
 
@@ -48,6 +52,8 @@
 		}
 	}
 
+	$totalNum += $num;
+	$totalPass += $pass;
 	echo "<font color='".($num == $pass ? "green" : "orange")."'>Passed (".$pass."/".$num.") tests.</font><br><br>";
 
 	// Robustness tests
@@ -59,12 +65,14 @@
 		"robustness/brackets.kv" => "ValveKV\ParseException",
 		"robustness/brackets2.kv" => "ValveKV\ParseException",
 		"robustness/keycollision.kv" => "ValveKV\KeyCollisionException",
+		"robustness/baseunexisting.kv" => "Exception",
 	];
 
 	$num = count($tests);
 	$pass = 0;
 	echo "Running robustness tests...<br>";
 	foreach ($tests as $file => $expected) {
+		echo "Testing ".$file."<br>";
 		// Create new parser
 		$parser = new ValveKV();
 
@@ -95,6 +103,90 @@
 		}
 	}
 
+	$totalNum += $num;
+	$totalPass += $pass;
+	echo "<font color='".($num == $pass ? "green" : "orange")."'>Passed (".$pass."/".$num.") tests.</font><br><br>";
+
+	// Test vkv testcases
+	$tests = [
+		"vkv/comment_singleline.vdf" => true,
+		"vkv/comment_singleline_wholeline.vdf" => true,
+		"vkv/comment_singleline_singleslash.vdf" => true,
+		"vkv/comment_singleline_singleslash_wholeline.vdf" => true,
+		"vkv/conditional.vdf" => true,
+		"vkv/conditional_in_key.vdf" => true,
+		"vkv/duplicate_keys.vdf" => true,
+		"vkv/duplicate_keys_object.vdf" => true,
+		"vkv/empty.vdf" => true,
+		"vkv/escaped_backslash.vdf" => true,
+		"vkv/escaped_backslash_not_special.vdf" => true,
+		"vkv/escaped_garbage.vdf" => true,
+		"vkv/escaped_quotation_marks.vdf" => true,
+		"vkv/escaped_whitespace.vdf" => true,
+		"vkv/invalid_conditional.vdf" => true, // No conditional validation
+		"vkv/invalid_zerobracerepeated.vdf" => false,
+		"vkv/kv_base_included.vdf" => true,
+		"vkv/kv_included.vdf" => true,
+		"vkv/kv_with_base.vdf" => true,
+		"vkv/kv_with_include.vdf" => false, // #include not supported
+		"vkv/legacydepotdata_subset.vdf" => true,
+		"vkv/list_of_values.vdf" => true,
+		"vkv/list_of_values_empty_key.vdf" => true,
+		"vkv/list_of_values_skipping_keys.vdf" => true,
+		"vkv/nameonly.vdf" => false,
+		"vkv/nested_object_graph.vdf" => true,
+		"vkv/object_person.vdf" => true,
+		"vkv/object_person_attributes.vdf" => true,
+		"vkv/object_person_mixed_case.vdf" => true,
+		"vkv/partial_noclose.vdf" => false,
+		"vkv/partial_nodata.vdf" => false,
+		"vkv/partial_novalue.vdf" => false,
+		"vkv/partial_opening_key.vdf" => false,
+		"vkv/partial_opening_value.vdf" => false,
+		"vkv/partial_partialkey.vdf" => false,
+		"vkv/partial_partialvalue.vdf" => false,
+		"vkv/partialname.vdf" => false,
+		"vkv/quoteonly.vdf" => false,
+		"vkv/serialization_expected.vdf" => true,
+		"vkv/steam_440.vdf" => true,
+		"vkv/top_level_list_of_values.vdf" => true,
+		"vkv/type_guessing.vdf" => true,
+		"vkv/unquoted_document.vdf" => true,
+	];
+
+	$num = count($tests);
+	$pass = 0;
+
+	echo "Running vkv tests...<br>";
+	foreach ($tests as $file => $shouldParse) {
+		echo "Testing ".$file."<br>";
+		// Create new parser
+		$parser = new ValveKV();
+		// Try to parse
+		try {
+			$parser->parseFromFile("testcases/".$file);
+			if ($shouldParse) {
+				$pass++;
+			} else {
+				if (PRINT_ERRORS) {
+					echo $file." successfully parsed but should have failed.";
+				}
+				echo "<font color='red'>Testcase ".$file." failed.</font><br>";
+			}
+		} catch(\Exception $e) {
+			if (!$shouldParse) {
+				$pass++;
+			} else {
+				if (PRINT_ERRORS) {
+					print_r($e);
+				}
+				echo "<font color='red'>Testcase ".$file." failed.</font><br>";
+			}
+		}
+	}
+
+	$totalNum += $num;
+	$totalPass += $pass;
 	echo "<font color='".($num == $pass ? "green" : "orange")."'>Passed (".$pass."/".$num.") tests.</font><br><br>";
 
 	// Test if benchmark files successfully parse
@@ -109,6 +201,7 @@
 
 	echo "Running benchmark tests...<br>";
 	foreach ($tests as $file) {
+		echo "Testing ".$file."<br>";
 		// Create new parser
 		$parser = new ValveKV();
 		// Try to parse
@@ -123,4 +216,9 @@
 		}
 	}
 
+	$totalNum += $num;
+	$totalPass += $pass;
 	echo "<font color='".($num == $pass ? "green" : "orange")."'>Passed (".$pass."/".$num.") tests.</font><br><br>";
+
+	// Report total
+	echo "<font color='".($totalNum == $totalPass ? "green" : "orange")."'>TOTAL: Passed (".$totalPass."/".$totalNum.") tests.</font><br><br>";

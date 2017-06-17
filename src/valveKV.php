@@ -58,6 +58,11 @@
             // Strip BOM header
             $this->stream = preg_replace('/^[\xef\xbb\xbf\xff\xfe\xfe\xff]*/', '', $this->stream);
 
+            // Check for empty files, return empty object
+            if (strlen($this->stream) == 0) {
+                return [];
+            }
+
             $this->streamlen = strlen($this->stream);
             $this->index = 0;
             $this->next = $this->stream[0];
