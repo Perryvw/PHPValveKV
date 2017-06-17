@@ -3,7 +3,7 @@ A parser for Valve's KeyValue serialization format, written in PHP.
 
 The parser supports parsing from files and strings. It can deal with most of the quirks of the Valve KV language such as conditionals, un-quoted keys or values, #base includes.
 
-Thanks to [xPaw](https://github.com/xPaw) and [ValveKeyValue](https://github.com/SteamDatabase/ValveKeyValue)
+Thanks to [xPaw](https://github.com/xPaw) for his help and the [ValveKeyValue](https://github.com/SteamDatabase/ValveKeyValue) project for their testcases.
 
 ## Usage
 ```php
