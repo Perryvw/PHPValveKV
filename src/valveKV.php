@@ -111,7 +111,7 @@
 
                 // Merge
                 foreach ($firstBaseRoot as $key => $value) {
-                    if (!array_key_exists($key, $root)) {
+                    if (!isset($root[$firstRoot][$key])) {
                         $root[$firstRoot][$key] = $value;
                     } else {
                         throw new KeyCollisionException($key, $this->fullPath, $this->path.$path);
@@ -143,7 +143,7 @@
             // Skip whitespace
             $this->skipWhitespace();
 
-            while ($this->next !== "}") {
+            while ($this->next !== "}" && $this->next !== false) {
                 // Read key, if it does not start with " read quoteless
                 $key = $this->next === "\"" ? $this->parseString() : $this->parseQuotelessString();
 
