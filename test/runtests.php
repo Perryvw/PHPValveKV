@@ -192,8 +192,9 @@
 	// Test if benchmark files successfully parse
 	$tests = [
 		"benchmark/dota_english.txt",
-		"benchmark/weapon_ak47.txt",
 		"benchmark/items.txt",
+		"benchmark/npc_units.txt",
+		"benchmark/weapon_ak47.txt",
 	];
 
 	$num = count($tests);
