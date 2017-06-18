@@ -16,9 +16,6 @@
         private $streamlen;
         private $next;
 
-        private $line;
-        private $lineStart;
-
         public function __construct() {
         }
 
@@ -66,10 +63,6 @@
             $this->streamlen = strlen($this->stream);
             $this->index = 0;
             $this->next = $this->stream[0];
-
-            // Keep track of line for error messages
-            $this->line = 1;
-            $this->lineStart = 0;
 
             $this->skipWhitespace();
 
@@ -193,7 +186,7 @@
                 $endPos = strpos($this->stream, "\"", $endPos + 1);
 
                 if ($endPos === false) {
-                    throw new ParseException("Missing ending quote for string.", $this->line, $this->index - $this->lineStart + 1);
+                    throw new ParseException("Missing ending quote for string.", $this->index);
                 }
 
                 // Count backslashes before closing quote
@@ -218,8 +211,6 @@
             $this->index = $endPos;
             $this->next = $this->stream[$this->index];
 
-            //$this->line += substr_count($str, "\n");
-
             $this->nextChar("\"");
 
             return $str;
@@ -242,11 +233,11 @@
             $current = $this->next;
 
             if ($current === false) {
-                throw new ParseException("Unexpected EOF (end-of-file).", $this->line, $this->index - $this->lineStart + 1);
+                throw new ParseException("Unexpected EOF (end-of-file).", $this->index);
             }
 
             if ($expected && $current !== $expected) {
-                throw new ParseException("Unexpected character '".$current."', expected '".$expected.".", $this->line, $this->index - $this->lineStart + 1);
+                throw new ParseException("Unexpected character '".$current."', expected '".$expected.".", $this->index);
             }
 
             $this->step();
@@ -255,12 +246,12 @@
         }
 
         // Step forward through the stream
-        private function step($steps = 1) {
+        private function step() {
             // Do not allow stepping from beyond the end of the stream
             if ($this->index >= $this->streamlen) {
-                throw new ParseException("Unexpected EOF (end-of-file).", $this->line, $this->index - $this->lineStart + 1);
+                throw new ParseException("Unexpected EOF (end-of-file).", $this->index);
             }
-            $this->index += $steps;
+            $this->index++;
 
             if ($this->index >= $this->streamlen) {
                 $this->next = false;
@@ -271,26 +262,25 @@
 
         private function skipWhitespace() {
             // Ignore whitespace
-            while ($this->next === " " || $this->next === "\t" || $this->next === "\r" || $this->next === "\n" || $this->next === "/" || $this->next === "[") {
-                if ($this->next === "/") {
-                    // Look ahead one more
-                    $c2 = $this->stream[$this->index + 1];
-                    // Although Valve uses the double-slash convention, the KV spec allows for single-slash comments.
-                    if ($c2 === "*") {
-                        $this->ignoreMLComment();
-                    } else {
-                        $this->ignoreSLComment();
-                    }
-                } else if ($this->next === "[") {
-                    $this->ignoreConditional();
-                } else if ($this->next === "\n") {
-                    // Increase line count
-                    $this->line++;
-                    $this->lineStart = $this->index;
-                }
-
-                // Increment position
+            while ($this->next === " " || $this->next === "\t" || $this->next === "\r" || $this->next === "\n") {
                 $this->step();
+            }
+
+            if ($this->next === "/") {
+                $c2 = $this->stream[$this->index + 1];
+                if ($c2 === "*") {
+                    $this->ignoreMLComment();
+                } else {
+                    $this->ignoreSLComment();
+                }
+                $this->skipWhitespace();
+                return;
+            }
+
+            if ($this->next === "[") {
+                $this->ignoreConditional();
+                $this->skipWhitespace();
+                return;
             }
         }
 
@@ -300,7 +290,7 @@
             $end = strpos($this->stream, "]", $this->index);
 
             if ($end === false) {
-                throw new ParseException("Missing ending ] for conditional.", $this->line, $this->index - $this->lineStart + 1);
+                throw new ParseException("Missing ending ] for conditional.", $this->index);
             }
 
             $this->index = $end;
@@ -345,9 +335,9 @@
 
     class ParseException extends \Exception {
         // Redefine consructor
-        public function __construct($message, $line, $column) {
+        public function __construct($message, $index) {
             // Super
-            parent::__construct($message." Line: ".$line."; Column: ".$column.".");
+            parent::__construct($message." At index: ".$index.".");
         }
     }
 
