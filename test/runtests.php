@@ -15,9 +15,11 @@
 		"comments.kv"	=> ["A" => ["B" => ["C" => ["D" => []]]]],
 		"stringescapes.kv"	=> ["Test" => ["A" => "3\\\"5", "B" => "A\\\\", "C" => "\\\\"]],
 		"quoteless.kv" => ["TestDocument" => ["QuotedChild" => "edge\\ncase\\\"haha\\\\\"", "UnquotedChild" => ["Key1" => "Value1", "Key2" => "Value2", "Key3" => "Value3"]]],
-		"conditional.kv" => ["test case" => ["operating system" => "something else", "platform" => "windows", "ui type" => "Xbox 360", "ui size" => "large"]],
+		"conditional.kv" => ["test case" => ["operating system" => ["windows 32-bit", "something else"], "platform" => "windows", "ui type" => ["Widescreen Xbox 360", "Xbox 360"], 
+			"ui size" => ["small", "medium", "large"]]],
 		"base.kv" => ["root" => ["rootProp" => "A", "included1" => "B", "included2" => ["C" => "D"]]],
-		"multipleroots.kv" => ["root1" => ["A" => "B"], "root2" => ["C" => "D"]]
+		"multipleroots.kv" => ["root1" => ["A" => "B"], "root2" => ["C" => "D"]],
+		"duplicatekeys.kv" => ["root" => ["key1" => ["2", "4", ["key2" => ["5", "6"]]]]]
 	];
 
 	// Run tests

@@ -151,7 +151,11 @@
                 // Read value
                 $val = $this->parseValue();
                 if (isset($properties[$key])) {
-                    $properties = array_replace_recursive($properties, [$key => $val]);
+                    if (is_array($properties[$key]) && isset($properties[$key][0])) {
+                        $properties[$key][] = $val;
+                    } else {
+                        $properties[$key] = [$properties[$key], $val];
+                    }
                 } else {
                     $properties[$key] = $val;
                 }
