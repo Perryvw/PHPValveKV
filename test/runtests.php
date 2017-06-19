@@ -19,21 +19,21 @@
 			"ui size" => ["small", "medium", "large"]]],
 		"base.kv" => ["root" => ["rootProp" => "A", "included1" => "B", "included2" => ["C" => "D"]]],
 		"multipleroots.kv" => ["root1" => ["A" => "B"], "root2" => ["C" => "D"]],
-		"duplicatekeys.kv" => ["root" => ["key1" => ["2", "4", ["key2" => ["5", "6"]]]]]
+		"duplicatekeys.kv" => ["root" => ["key1" => ["2", ["key2" => ["5", "6"]], ["key3" => "4"]]]]
 	];
 
 	// Run tests
 	$num = count($tests);
 	$pass = 0;
-	echo "Running functionality tests...<br>";
-	foreach ($tests as $file => $expected) {
+	function runTest($file, $expected, $merge = false) {
+		global $pass;
 		echo "Testing ".$file."<br>";
 		// Create new parser
 		$parser = new ValveKV();
 
 		// Parse the file
 		try {
-			$result = $parser->parseFromFile("testcases/".$file);
+			$result = $parser->parseFromFile("testcases/".$file, $merge);
 			if ($expected == $result) {
 				// Pass!
 				$pass++;
@@ -53,6 +53,14 @@
 			echo "<font color='red'>Testcase ".$file." failed.</font><br>";
 		}
 	}
+	echo "<b>Running functionality tests...</b><br>";
+
+	foreach ($tests as $file => $expected) {
+		runTest($file, $expected);
+	}
+	// Extra duplicate merge test
+	$num++;
+	runTest("duplicatekeys.kv", ["root" => ["key1" => ["key2" => "6", "key3" => "4"]]], true);
 
 	$totalNum += $num;
 	$totalPass += $pass;
@@ -72,7 +80,7 @@
 
 	$num = count($tests);
 	$pass = 0;
-	echo "Running robustness tests...<br>";
+	echo "<b>Running robustness tests...</b><br>";
 	foreach ($tests as $file => $expected) {
 		echo "Testing ".$file."<br>";
 		// Create new parser
@@ -159,7 +167,7 @@
 	$num = count($tests);
 	$pass = 0;
 
-	echo "Running vkv tests...<br>";
+	echo "<b>Running vkv tests...</b><br>";
 	foreach ($tests as $file => $shouldParse) {
 		echo "Testing ".$file."<br>";
 		// Create new parser
@@ -202,7 +210,7 @@
 	$num = count($tests);
 	$pass = 0;
 
-	echo "Running benchmark tests...<br>";
+	echo "<b>Running benchmark tests...</b><br>";
 	foreach ($tests as $file) {
 		echo "Testing ".$file."<br>";
 		// Create new parser

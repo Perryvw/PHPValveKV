@@ -4,12 +4,15 @@
      * This parser parses a kv file string to an associative array.
      * 
      * Example usage:
-     * $parser = new ValveKV($kvString);
-     * $kv = $parser->parse();
+     * $parser = new ValveKV();
+     * $kv = $parser->parseFromFule(path, [mergeDuplicates = false]);
+     * $kv = $parser->parseFromString(string, [mergeDuplicates = false]);
      */
     namespace ValveKV;
 
     class ValveKV {
+
+        private $mergeDuplicates; // This flag determines what to do with duplicate files
 
         private $index;
         private $stream;
@@ -19,13 +22,13 @@
         public function __construct() {
         }
 
-        public function parseFromString($str) {
+        public function parseFromString($str, $mergeDuplicates = false) {
             $this->fullPath = "./";
             $this->path = "./";
-            return $this->initialise($str);
+            return $this->initialise($str, $mergeDuplicates);
         }
 
-        public function parseFromFile($path) {
+        public function parseFromFile($path, $mergeDuplicates = false) {
             if (file_exists($path)) {
                 // Get path for bases
                 $this->fullPath = $path;
@@ -36,13 +39,14 @@
                     $this->path = "./";
                 }
                 $str = file_get_contents($path);
-                return $this->initialise($str);
+                return $this->initialise($str, $mergeDuplicates);
             } else {
                 throw new \Exception("Could not find a file at path '".$path."'.");
             }
         }
 
-        private function initialise($str) {
+        private function initialise($str, $mergeDuplicates) {
+            $this->mergeDuplicates = $mergeDuplicates;
             $this->stream = $str;
             unset($str);
 
@@ -150,11 +154,20 @@
 
                 // Read value
                 $val = $this->parseValue();
+
+                // Check if this is a duplicate
                 if (isset($properties[$key])) {
-                    if (is_array($properties[$key]) && isset($properties[$key][0])) {
-                        $properties[$key][] = $val;
+                    // Handle duplicate according to $this->mergeDuplicates
+                    if ($this->mergeDuplicates) {
+                        // merge duplicates
+                        $properties = array_replace_recursive($properties, [$key => $val]);
                     } else {
-                        $properties[$key] = [$properties[$key], $val];
+                        // Store list of duplicates
+                        if (is_array($properties[$key]) && isset($properties[$key][0])) {
+                            $properties[$key][] = $val;
+                        } else {
+                            $properties[$key] = [$properties[$key], $val];
+                        }
                     }
                 } else {
                     $properties[$key] = $val;
