@@ -9,10 +9,19 @@ Thanks to [xPaw](https://github.com/xPaw) for his help and the [ValveKeyValue](h
 ```php
 require "valveKV.php";
 
+// Create a parser instance.
 $parser = new \ValveKV\ValveKV();
+// Parse a KV string.
 $kvFromString = $parser->parseFromString('"root"{"A" "B"}');
+// Parse a KV file.
 $kvFromFile = $parser->parseFromFile("myKVFile.txt");
+
+// Parse while merging the values of duplicate keys.
+$kvFromFile2 = $parser->parseFromFile("myKVFile.txt", true);
 ```
+
+### Duplicate keys
+The KV format can contain duplicate keys. By default, the value of duplicate keys will be transformed into a list of its different values. The functions `parseFromString` and `parseFromFile` both have a flag `mergeDuplicates` that merges the values of duplicate keys (if they are arrays) instead of adding them to a list.
 
 ## Test status
 Currently the parser is covered by a large amount of test cases that all pass.
