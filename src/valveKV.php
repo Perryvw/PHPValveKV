@@ -342,7 +342,7 @@
 
                 $this->step();
 
-                if ($c === "/") {
+                if ($this->next === "/") {
                     $this->step();
                     break;
                 }
