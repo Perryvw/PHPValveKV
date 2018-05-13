@@ -84,26 +84,16 @@
                 $bases[$path] = $parser->parseFromFile($this->path.$path);
             }
 
-            $root = [];
+            $roots = $this->parseObject(false);
 
-            // Check if this file contains a root object
-            while ($this->next !== false) {
-                // Parse root name
-                $name = $this->next === "\"" ? $this->parseString() : $this->parseQuotelessString();
-
-                // Skip whitespace
-                $this->skipWhitespace();
-
-                // Parse root
-                $root[$name] = $this->parseObject();
-
-                // Skip trailing whitespace
-                $this->skipWhitespace();
+            // Check if we successfully reached the end of the file
+            if ($this->next !== false) {
+                throw new ParseException("Expected EOF but found (end-of-file).", $this->index);
             }
 
-            // Get first key in $root
-            reset($root);
-            $firstRoot = key($root);
+            // Get first key in $roots
+            reset($roots);
+            $firstRoot = key($roots);
 
             // Add bases to root
             foreach ($bases as $path => $base) {
@@ -113,15 +103,15 @@
 
                 // Merge
                 foreach ($firstBaseRoot as $key => $value) {
-                    if (!isset($root[$firstRoot][$key])) {
-                        $root[$firstRoot][$key] = $value;
+                    if (!isset($roots[$firstRoot][$key])) {
+                        $roots[$firstRoot][$key] = $value;
                     } else {
                         throw new KeyCollisionException($key, $this->fullPath, $this->path.$path);
                     }
                 }
             }
 
-            return $root;
+            return $roots;
         }
 
         private function parseBase() {
@@ -137,8 +127,8 @@
         }
 
         // Parse a single object.
-        private function parseObject() {
-            $this->nextChar("{");
+        private function parseObject($expectBrackets = true) {
+            if ($expectBrackets === true) $this->nextChar("{");
 
             $properties = array();
 
@@ -176,7 +166,7 @@
                 $this->skipWhitespace();
             }
 
-            $this->nextChar("}");
+            if ($expectBrackets === true) $this->nextChar("}");
 
             return $properties;
         }
@@ -188,8 +178,10 @@
             }
             else if ($this->next === "{") {
                 return $this->parseObject();
-            } else {
+            } else if (ctype_alpha($this->next) || is_numeric($this->next)) {
                 return $this->parseQuotelessString();
+            } else {
+                throw new ParseException("Unexpected character '".$current."', expected '".$expected.".", $this->index);
             }
         }
 

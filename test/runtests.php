@@ -19,7 +19,8 @@
 			"ui size" => ["small", "medium", "large"]]],
 		"base.kv" => ["root" => ["rootProp" => "A", "included1" => "B", "included2" => ["C" => "D"]]],
 		"multipleroots.kv" => ["root1" => ["A" => "B"], "root2" => ["C" => "D"]],
-		"duplicatekeys.kv" => ["root" => ["key1" => ["2", ["key2" => ["5", "6"]], ["key3" => "4"]]]]
+		"duplicatekeys.kv" => ["root" => ["key1" => ["2", ["key2" => ["5", "6"]], ["key3" => "4"]]]],
+		"duplicaterootkeys.kv" => ["root" => [["key1" => 2, "key2" => 4], ["key1" => 3, "key2" => 5]]]
 	];
 
 	// Run tests
@@ -42,7 +43,7 @@
 				if (PRINT_ERRORS) {
 					echo "Result:<br>";
 					print_r($result);
-					echo "Expected:<br>";
+					echo "<br>Expected:<br>";
 					print_r($expected);
 				}
 				echo "<font color='red'>Testcase ".$file." failed.</font><br>";
