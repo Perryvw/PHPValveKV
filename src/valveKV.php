@@ -178,7 +178,7 @@
             }
             else if ($this->next === "{") {
                 return $this->parseObject();
-            } else if (ctype_alpha($this->next) || is_numeric($this->next)) {
+            } else if (ctype_graph($this->next)) {
                 return $this->parseQuotelessString();
             } else {
                 throw new ParseException("Unexpected character '".$current."', expected '".$expected.".", $this->index);
