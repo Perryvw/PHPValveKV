@@ -162,8 +162,15 @@
                 } else {
                     $properties[$key] = $val;
                 }
+
                 // Skip whitespace
                 $this->skipWhitespace();
+
+                // If next is conditional skip that too
+                if ($this->next == "[") {
+                    $this->ignoreConditional();
+                    $this->skipWhitespace();
+                }
             }
 
             if ($expectBrackets === true) $this->nextChar("}");
@@ -178,7 +185,9 @@
             }
             else if ($this->next === "{") {
                 return $this->parseObject();
-            } else if (ctype_graph($this->next)) {
+            } else if ($this->next === "[") {
+                return $this->parseBracketString();
+            }else if (ctype_graph($this->next)) {
                 return $this->parseQuotelessString();
             } else {
                 throw new ParseException("Unexpected character '".$current."', expected '".$expected.".", $this->index);
@@ -225,10 +234,27 @@
             return $str;
         }
 
+        // Parse a string.
+        private function parseBracketString() {
+            $this->nextChar("[");
+
+            $start = $this->index;
+
+            while ($this->next !== "]" && $this->next !== false) {
+                $this->step();
+            }
+
+            $str = substr($this->stream, $start, $this->index - $start);
+
+            $this->nextChar("]");
+
+            return "[".$str."]";
+        }
+
         private function parseQuotelessString() {
             $start = $this->index;
 
-            while ($this->next !== " " && $this->next !== "\t" && $this->next !== "\r" && $this->next !== "\n" && $this->next !== false) {
+            while (!ctype_space($this->next) && $this->next !== false) {
                 $this->step();
             }
 
@@ -246,7 +272,7 @@
             }
 
             if ($expected && $current !== $expected) {
-                throw new ParseException("Unexpected character '".$current."', expected '".$expected.".", $this->index);
+                throw new ParseException("Unexpected character '".$current."', expected '".$expected."'.", $this->index);
             }
 
             $this->step();
@@ -282,12 +308,6 @@
                 } else {
                     $this->ignoreSLComment();
                 }
-                $this->skipWhitespace();
-                return;
-            }
-
-            if ($this->next === "[") {
-                $this->ignoreConditional();
                 $this->skipWhitespace();
                 return;
             }
