@@ -5,6 +5,9 @@ The parser supports parsing from files and strings. It can deal with most of the
 
 Thanks to [xPaw](https://github.com/xPaw) for his help and the [ValveKeyValue](https://github.com/SteamDatabase/ValveKeyValue) project for their testcases.
 
+# Typed version available
+This library is available with typed properties on the [typed-at-php7.4](https://github.com/Perryvw/PHPValveKV/tree/typed-at-php7.4) branch. This version will only work with php version >= 7.4!
+
 ## Usage
 ```php
 require "valveKV.php";
