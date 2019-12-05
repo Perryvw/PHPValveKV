@@ -12,40 +12,36 @@
 
     class ValveKV {
 
-        private $mergeDuplicates; // This flag determines what to do with duplicate files
+        private bool $mergeDuplicates; // This flag determines what to do with duplicate files
 
-        private $index;
-        private $stream;
-        private $streamlen;
-        private $next;
+        private int $index;
+        private string $stream;
+        private int $streamlen;
+        private ?string $next;
+        private string $path;
 
         public function __construct() {
         }
 
-        public function parseFromString($str, $mergeDuplicates = false) {
-            $this->fullPath = "./";
+        public function parseFromString(string $str, bool $mergeDuplicates = false) : array {
             $this->path = "./";
             return $this->initialise($str, $mergeDuplicates);
         }
 
-        public function parseFromFile($path, $mergeDuplicates = false) {
+        public function parseFromFile(string $path, bool $mergeDuplicates = false) : array {
             if (file_exists($path)) {
-                // Get path for bases
-                $this->fullPath = $path;
-                $path = str_replace("\\", "/", $path);
-                if (strpos($path, "/") !== false) {
-                    $this->path = substr($path, 0, strrpos($path, "/") + 1);
-                } else {
-                    $this->path = "./";
-                }
+                $this->path = $path;
                 $str = file_get_contents($path);
+                if(!$str) {
+                    throw new \Exception("Failed to read '".$path."'.");
+                }
                 return $this->initialise($str, $mergeDuplicates);
             } else {
                 throw new \Exception("Could not find a file at path '".$path."'.");
             }
         }
 
-        private function initialise($str, $mergeDuplicates) {
+        private function initialise(string $str, bool $mergeDuplicates) : array {
             $this->mergeDuplicates = $mergeDuplicates;
             $this->stream = $str;
             unset($str);
@@ -74,39 +70,36 @@
         }
 
         // Parse a complete KV string.
-        private function parseKV() {
+        private function parseKV() : array {
             // Parse bases
             $bases = [];
             while ($this->next === "#") {
                 $path = $this->parseBase();
                 $this->skipWhitespace();
                 $parser = new ValveKV();
-                $bases[$path] = $parser->parseFromFile($this->path.$path);
+                $bases[$path] = $parser->parseFromFile(dirname($this->path).DIRECTORY_SEPARATOR.$path);
             }
 
             $roots = $this->parseObject(false);
 
             // Check if we successfully reached the end of the file
-            if ($this->next !== false) {
+            if ($this->next !== null) {
                 throw new ParseException("Expected EOF but found (end-of-file).", $this->index);
             }
 
             // Get first key in $roots
             reset($roots);
             $firstRoot = key($roots);
-
             // Add bases to root
             foreach ($bases as $path => $base) {
                 // Get first root in base
-                reset($base);
-                $firstBaseRoot = $base[key($base)];
-
+                $firstBaseRoot = reset($base);
                 // Merge
                 foreach ($firstBaseRoot as $key => $value) {
                     if (!isset($roots[$firstRoot][$key])) {
                         $roots[$firstRoot][$key] = $value;
                     } else {
-                        throw new KeyCollisionException($key, $this->fullPath, $this->path.$path);
+                        throw new KeyCollisionException($key, $this->path, $this->path.$path);
                     }
                 }
             }
@@ -114,7 +107,7 @@
             return $roots;
         }
 
-        private function parseBase() {
+        private function parseBase() : string {
             $this->nextChar("#");
             $this->nextChar("b");
             $this->nextChar("a");
@@ -127,7 +120,7 @@
         }
 
         // Parse a single object.
-        private function parseObject($expectBrackets = true) {
+        private function parseObject(bool $expectBrackets = true) : array {
             if ($expectBrackets === true) $this->nextChar("{");
 
             $properties = array();
@@ -135,7 +128,7 @@
             // Skip whitespace
             $this->skipWhitespace();
 
-            while ($this->next !== "}" && $this->next !== false) {
+            while ($this->next !== null && $this->next !== "}") {
                 // Read key, if it does not start with " read quoteless
                 $key = $this->next === "\"" ? $this->parseString() : $this->parseQuotelessString();
 
@@ -178,24 +171,29 @@
             return $properties;
         }
 
-        // Parse a value, either a string or an object.
+        /**
+         * Parse a value, either a string or an object.
+         *
+         * @return array|string
+         */
         private function parseValue() {
-            if ($this->next === "\"") {
+            if ($this->next === null) {
+                throw new ParseException("Unexpected EOF (end-of-file).", $this->index);
+            } else if ($this->next === "\"") {
                 return $this->parseString();
-            }
-            else if ($this->next === "{") {
+            } else if ($this->next === "{") {
                 return $this->parseObject();
             } else if ($this->next === "[") {
                 return $this->parseBracketString();
-            }else if (ctype_graph($this->next)) {
+            } else if (ctype_graph($this->next)) {
                 return $this->parseQuotelessString();
             } else {
-                throw new ParseException("Unexpected character '".$current."', expected '".$expected.".", $this->index);
+                throw new ParseException("Unexpected character '".$this->next."'.", $this->index);
             }
         }
 
         // Parse a string.
-        private function parseString() {
+        private function parseString() : string {
             $this->nextChar("\"");
 
             // Find next quote
@@ -235,39 +233,39 @@
         }
 
         // Parse a string.
-        private function parseBracketString() {
+        private function parseBracketString() : string {
             $this->nextChar("[");
 
             $start = $this->index;
 
-            while ($this->next !== "]" && $this->next !== false) {
+            while ($this->next !== null && $this->next !== "]") {
                 $this->step();
             }
 
-            $str = substr($this->stream, $start, $this->index - $start);
+            $str = (string)substr($this->stream, $start, $this->index - $start);
 
             $this->nextChar("]");
 
             return "[".$str."]";
         }
 
-        private function parseQuotelessString() {
+        private function parseQuotelessString() : string {
             $start = $this->index;
 
-            while (!ctype_space($this->next) && $this->next !== false) {
+            while ($this->next !== null && !ctype_space($this->next)) {
                 $this->step();
             }
 
-            return substr($this->stream, $start, $this->index - $start);
+            return (string)substr($this->stream, $start, $this->index - $start);
         }
 
         // Get the next character, allows an expected value. If the next character does not
         // match the expected character throws an error.
-        private function nextChar($expected = null) {
+        private function nextChar(?string $expected = null) : string {
 
             $current = $this->next;
 
-            if ($current === false) {
+            if ($current === null) {
                 throw new ParseException("Unexpected EOF (end-of-file).", $this->index);
             }
 
@@ -281,7 +279,7 @@
         }
 
         // Step forward through the stream
-        private function step() {
+        private function step() : void {
             // Do not allow stepping from beyond the end of the stream
             if ($this->index >= $this->streamlen) {
                 throw new ParseException("Unexpected EOF (end-of-file).", $this->index);
@@ -289,13 +287,13 @@
             $this->index++;
 
             if ($this->index >= $this->streamlen) {
-                $this->next = false;
+                $this->next = null;
             } else {
                 $this->next = $this->stream[$this->index];
             }            
         }
 
-        private function skipWhitespace() {
+        private function skipWhitespace() : void {
             // Ignore whitespace
             while ($this->next === " " || $this->next === "\t" || $this->next === "\r" || $this->next === "\n") {
                 $this->step();
@@ -313,7 +311,7 @@
             }
         }
 
-        private function ignoreConditional() {
+        private function ignoreConditional() : void {
             $this->nextChar("[");
 
             $end = strpos($this->stream, "]", $this->index);
@@ -329,14 +327,14 @@
         }
 
         // Advance the read index until after the single line comment
-        private function ignoreSLComment() {
+        private function ignoreSLComment() : void {
             $this->step();
 
             $end = strpos($this->stream, "\n", $this->index);
 
             if ($end === false) {
                 $this->index = $this->streamlen-1;
-                $this->next = false;
+                $this->next = null;
             } else {
                 $this->index = $end;
                 $this->next = $this->stream[$this->index];
@@ -344,7 +342,7 @@
         }
 
         // Advance read index until after the multi-line comment
-        private function ignoreMLComment() {
+        private function ignoreMLComment() : void {
             $this->step();
 
             while (true) {
@@ -364,7 +362,7 @@
 
     class ParseException extends \Exception {
         // Redefine consructor
-        public function __construct($message, $index) {
+        public function __construct(string $message, int $index) {
             // Super
             parent::__construct($message." At index: ".$index.".");
         }
@@ -372,7 +370,7 @@
 
     class KeyCollisionException extends \Exception {
         // Redefine consructor
-        public function __construct($key, $file1, $file2) {
+        public function __construct(string $key, string $file1, string $file2) {
             // Super
             parent::__construct("Key collision on key '".$key."'"." Path 1: '".$file1."'; File 2: '".$file2."'.");
         }
