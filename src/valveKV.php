@@ -302,7 +302,7 @@
             }
 
             if ($this->next === "/") {
-                $c2 = $this->stream[$this->index + 1];
+                $c2 = $this->index + 1 < $this->streamlen ? $this->stream[$this->index + 1] : "";
                 if ($c2 === "*") {
                     $this->ignoreMLComment();
                 } else {
