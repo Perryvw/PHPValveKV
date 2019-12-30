@@ -13,6 +13,7 @@
 		'basic2.kv' => ['A' => ['B' => 'C', 'D' => 'E']],
 		'nested.kv'	=> ['A' => ['B' => ['C' => ['D' => []]]]],
 		'comments.kv'	=> ['A' => ['B' => ['C' => ['D' => []]]]],
+		'commenteof.kv'	=> [],
 		'stringescapes.kv'	=> ['Test' => ['A' => '3\\"5', 'B' => 'A\\\\', 'C' => '\\\\']],
 		'quoteless.kv' => ['TestDocument' => ['QuotedChild' => 'edge\\ncase\\"haha\\\\"', 'UnquotedChild' => ['Key1' => 'Value1', 'Key2' => 'Value2', 'Key3' => 'Value3']]],
 		'quotelessBracket.kv' => ['TestDocument' => ['$envmaptint' => '[ .4 .4 .4]', '$envmapsaturation' => '[.5 .5 .5]']],
@@ -36,11 +37,10 @@
 
 		// Parse the file
 		try {
+			error_clear_last();
 			$result = $parser->parseFromFile("testcases/".$file, $merge);
-			if ($expected == $result) {
-				// Pass!
-				$pass++;
-			} else {
+
+			if ($expected != $result ) {
 				// Fail - wrong value
 				if (PRINT_ERRORS) {
 					echo "Result:<br>";
@@ -49,6 +49,16 @@
 					print_r($expected);
 				}
 				echo "<font color='red'>Testcase ".$file." failed.</font><br>";
+			} elseif (error_get_last()) {
+				// Fail - error
+				if (PRINT_ERRORS) {
+					echo "Error:<br>";
+					print_r(error_get_last());
+				}
+				echo "<font color='red'>Testcase ".$file." failed.</font><br>";
+			} else {
+				// Pass!
+				$pass++;
 			}
 		} catch (\Exception $e) {
 			// Fail - exception
