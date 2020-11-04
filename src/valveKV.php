@@ -300,14 +300,8 @@
             }
 
             if ($this->next === "/") {
-                $c2 = $this->index + 1 < $this->streamlen ? $this->stream[$this->index + 1] : "";
-                if ($c2 === "*") {
-                    $this->ignoreMLComment();
-                } else {
-                    $this->ignoreSLComment();
-                }
+                $this->ignoreComment();
                 $this->skipWhitespace();
-                return;
             }
         }
 
@@ -327,7 +321,7 @@
         }
 
         // Advance the read index until after the single line comment
-        private function ignoreSLComment() : void {
+        private function ignoreComment() : void {
             $this->step();
 
             $end = strpos($this->stream, "\n", $this->index);
@@ -338,24 +332,6 @@
             } else {
                 $this->index = $end;
                 $this->next = $this->stream[$this->index];
-            }
-        }
-
-        // Advance read index until after the multi-line comment
-        private function ignoreMLComment() : void {
-            $this->step();
-
-            while (true) {
-                while($this->next !== "*") {
-                    $this->step();
-                }
-
-                $this->step();
-
-                if ($this->next === "/") {
-                    $this->step();
-                    break;
-                }
             }
         }
     }

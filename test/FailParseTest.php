@@ -36,7 +36,6 @@ class FailParseTest extends \PHPUnit\Framework\TestCase
 			[ "vkv/partialname.vdf" ],
 			[ "vkv/quoteonly.vdf" ],
 			[ "vkv/missingconditionalend.kv" ],
-			[ "vkv/neverendingcomment.kv" ],
 			[ "vkv/unexpectedcharacter.kv" ],
 		];
 	}
