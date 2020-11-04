@@ -5,8 +5,7 @@ The parser supports parsing from files and strings. It can deal with most of the
 
 Thanks to [xPaw](https://github.com/xPaw) for his help and the [ValveKeyValue](https://github.com/SteamDatabase/ValveKeyValue) project for their testcases.
 
-# Typed version available
-This library is available with typed properties on the [typed-at-php7.4](https://github.com/Perryvw/PHPValveKV/tree/typed-at-php7.4) branch. This version will only work with php version >= 7.4!
+This library uses typed properties, and requires PHP 7.4 or higher.
 
 ## Usage
 ```php
@@ -22,6 +21,8 @@ $kvFromFile = $parser->parseFromFile("myKVFile.txt");
 // Parse while merging the values of duplicate keys.
 $kvFromFile2 = $parser->parseFromFile("myKVFile.txt", true);
 ```
+
+PSR-4 autoload is supported.
 
 ### Duplicate keys
 The KV format can contain duplicate keys. By default, the value of duplicate keys will be transformed into a list of its different values. The functions `parseFromString` and `parseFromFile` both have a flag `mergeDuplicates` that merges the values of duplicate keys (if they are arrays) instead of adding them to a list.

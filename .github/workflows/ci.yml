@@ -1,0 +1,18 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  php:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: [7.4]
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install dependencies
+      run: composer install --no-interaction --no-progress
+    - name: Run tests
+      run: php${{ matrix.php }} vendor/bin/phpunit --verbose --fail-on-warning --coverage-text
+    - name: Run phpstan
+      run: php${{ matrix.php }} vendor/bin/phpstan analyse
