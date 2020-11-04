@@ -30,6 +30,7 @@ class RobustnessTest extends \PHPUnit\Framework\TestCase
 			[ "robustness/brackets2.kv", "ValveKV\ParseException" ],
 			[ "robustness/keycollision.kv", "ValveKV\KeyCollisionException" ],
 			[ "robustness/baseunexisting.kv", "Exception" ],
+			[ "robustness/empty.kv", "Exception" ],
 		];
 	}
 }
