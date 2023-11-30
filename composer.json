@@ -1,5 +1,7 @@
 {
     "name": "perryvw/valvekv",
+    "description": "A parser for Valve's KeyValue serialization format. It can deal with most of the quirks of the Valve KV language such as conditionals, un-quoted keys or values, #base includes.",
+    "keywords": ["vdf", "valve", "keyvalue", "parser"],
     "type": "library",
     "license": "MIT",
     "autoload": {
