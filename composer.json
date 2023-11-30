@@ -5,6 +5,12 @@
     "autoload": {
         "psr-4": {"ValveKV\\": "src/"}
     },
+    "scripts": {
+        "test": [
+            "phpunit --fail-on-warning --coverage-text",
+            "phpstan analyse"
+        ]
+    },
     "require": {
         "php": ">=8.1"
     },
