@@ -20,7 +20,7 @@ class FailParseTest extends \PHPUnit\Framework\TestCase
 	/**
 	 * @return array<array<string>>
 	 */
-	public function failFileProvider() : array
+	public static function failFileProvider() : array
 	{
 		return [
 			[ "vkv/invalid_zerobracerepeated.vdf" ],

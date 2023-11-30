@@ -22,7 +22,7 @@ class BasicTest extends \PHPUnit\Framework\TestCase
 		$this->assertEquals( $expected, $result );
 	}
 
-	public function fileProvider() : array
+	public static function fileProvider() : array
 	{
 		return [
 			[ 'basic.kv', ['A' => ['B' => 'C']] ],
