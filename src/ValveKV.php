@@ -1,8 +1,10 @@
 <?php
+    declare(strict_types=1);
+
     /* ValveKV
      * Valve KeyValue (1) format recursive descent parser with 1 symbol lookahead.
      * This parser parses a kv file string to an associative array.
-     * 
+     *
      * Example usage:
      * $parser = new ValveKV();
      * $kv = $parser->parseFromFule(path, [mergeDuplicates = false]);
@@ -17,7 +19,7 @@
         private int $index;
         private string $stream;
         private int $streamlen;
-        private ?string $next;
+        private ?string $next = null;
         private string $path;
 
         public function __construct() {
@@ -29,16 +31,17 @@
         }
 
         public function parseFromFile(string $path, bool $mergeDuplicates = false) : array {
-            if (file_exists($path)) {
-                $this->path = $path;
-                $str = file_get_contents($path);
-                if(!$str) {
-                    throw new \Exception("Failed to read '".$path."'.");
-                }
-                return $this->initialise($str, $mergeDuplicates);
-            } else {
-                throw new \Exception("Could not find a file at path '".$path."'.");
+            if (!file_exists($path)) {
+                throw new \Exception("Could not find a file at path '" . $path . "'.");
             }
+
+            $this->path = $path;
+            $str = file_get_contents($path);
+            if (!$str) {
+                throw new \Exception("Failed to read '" . $path . "'.");
+            }
+
+            return $this->initialise($str, $mergeDuplicates);
         }
 
         private function initialise(string $str, bool $mergeDuplicates) : array {
@@ -47,16 +50,16 @@
             unset($str);
 
             // detect and convert utf-16, utf-32 and convert to utf8
-            if      (substr($this->stream, 0, 2) === "\xFE\xFF")         $this->stream = mb_convert_encoding($this->stream, 'UTF-8', 'UTF-16BE');
-            else if (substr($this->stream, 0, 2) === "\xFF\xFE")         $this->stream = mb_convert_encoding($this->stream, 'UTF-8', 'UTF-16LE');
-            else if (substr($this->stream, 0, 4) === "\x00\x00\xFE\xFF") $this->stream = mb_convert_encoding($this->stream, 'UTF-8', 'UTF-32BE');
-            else if (substr($this->stream, 0, 4) === "\xFF\xFE\x00\x00") $this->stream = mb_convert_encoding($this->stream, 'UTF-8', 'UTF-32LE');
+            if      (str_starts_with($this->stream, "\xFE\xFF"))         $this->stream = mb_convert_encoding($this->stream, 'UTF-8', 'UTF-16BE');
+            else if (str_starts_with($this->stream, "\xFF\xFE"))         $this->stream = mb_convert_encoding($this->stream, 'UTF-8', 'UTF-16LE');
+            else if (str_starts_with($this->stream, "\x00\x00\xFE\xFF")) $this->stream = mb_convert_encoding($this->stream, 'UTF-8', 'UTF-32BE');
+            else if (str_starts_with($this->stream, "\xFF\xFE\x00\x00")) $this->stream = mb_convert_encoding($this->stream, 'UTF-8', 'UTF-32LE');
 
             // Strip BOM header
             $this->stream = preg_replace('/^[\xef\xbb\xbf\xff\xfe\xfe\xff]*/', '', $this->stream);
 
             // Check for empty files, return empty object
-            if (strlen($this->stream) == 0) {
+            if ($this->stream === '') {
                 return [];
             }
 
@@ -76,8 +79,8 @@
             while ($this->next === "#") {
                 $path = $this->parseBase();
                 $this->skipWhitespace();
-                $parser = new ValveKV();
-                $bases[$path] = $parser->parseFromFile(dirname($this->path).DIRECTORY_SEPARATOR.$path);
+                $parser = new self();
+                $bases[$path] = $parser->parseFromFile(dirname($this->path) . DIRECTORY_SEPARATOR . $path);
             }
 
             $roots = $this->parseObject(false);
@@ -88,8 +91,7 @@
             }
 
             // Get first key in $roots
-            reset($roots);
-            $firstRoot = key($roots);
+            $firstRoot = array_key_first($roots);
             // Add bases to root
             foreach ($bases as $path => $base) {
                 // Get first root in base
@@ -99,7 +101,7 @@
                     if (!isset($roots[$firstRoot][$key])) {
                         $roots[$firstRoot][$key] = $value;
                     } else {
-                        throw new KeyCollisionException($key, $this->path, $this->path.$path);
+                        throw new KeyCollisionException($key, $this->path, $this->path . $path);
                     }
                 }
             }
@@ -115,15 +117,15 @@
             $this->nextChar("e");
 
             $this->skipWhitespace();
-            
+
             return $this->parseString();
         }
 
         // Parse a single object.
         private function parseObject(bool $expectBrackets = true) : array {
-            if ($expectBrackets === true) $this->nextChar("{");
+            if ($expectBrackets) $this->nextChar("{");
 
-            $properties = array();
+            $properties = [];
 
             // Skip whitespace
             $this->skipWhitespace();
@@ -160,23 +162,19 @@
                 $this->skipWhitespace();
 
                 // If next is conditional skip that too
-                if ($this->next == "[") {
+                if ($this->next === '[') {
                     $this->ignoreConditional();
                     $this->skipWhitespace();
                 }
             }
 
-            if ($expectBrackets === true) $this->nextChar("}");
+            if ($expectBrackets) $this->nextChar("}");
 
             return $properties;
         }
 
-        /**
-         * Parse a value, either a string or an object.
-         *
-         * @return array|string
-         */
-        private function parseValue() {
+        // Parse a value, either a string or an object.
+        private function parseValue() : array|string {
             if ($this->next === null) {
                 throw new ParseException("Unexpected EOF (end-of-file).", $this->index);
             } else if ($this->next === "\"") {
@@ -188,7 +186,7 @@
             } else if (ctype_graph($this->next)) {
                 return $this->parseQuotelessString();
             } else {
-                throw new ParseException("Unexpected character '".$this->next."'.", $this->index);
+                throw new ParseException("Unexpected character '" . $this->next . "'.", $this->index);
             }
         }
 
@@ -246,7 +244,7 @@
 
             $this->nextChar("]");
 
-            return "[".$str."]";
+            return "[" . $str . "]";
         }
 
         private function parseQuotelessString() : string {
@@ -270,7 +268,7 @@
             }
 
             if ($expected && $current !== $expected) {
-                throw new ParseException("Unexpected character '".$current."', expected '".$expected."'.", $this->index);
+                throw new ParseException("Unexpected character '" . $current . "', expected '" . $expected . "'.", $this->index);
             }
 
             $this->step();
@@ -290,7 +288,7 @@
                 $this->next = null;
             } else {
                 $this->next = $this->stream[$this->index];
-            }            
+            }
         }
 
         private function skipWhitespace() : void {
@@ -327,7 +325,7 @@
             $end = strpos($this->stream, "\n", $this->index);
 
             if ($end === false) {
-                $this->index = $this->streamlen-1;
+                $this->index = $this->streamlen - 1;
                 $this->next = null;
             } else {
                 $this->index = $end;
@@ -340,7 +338,7 @@
         // Redefine consructor
         public function __construct(string $message, int $index) {
             // Super
-            parent::__construct($message." At index: ".$index.".");
+            parent::__construct($message . " At index: " . $index . ".");
         }
     }
 
@@ -348,6 +346,6 @@
         // Redefine consructor
         public function __construct(string $key, string $file1, string $file2) {
             // Super
-            parent::__construct("Key collision on key '".$key."'"." Path 1: '".$file1."'; File 2: '".$file2."'.");
+            parent::__construct("Key collision on key '" . $key . "' Path 1: '" . $file1 . "'; File 2: '" . $file2 . "'.");
         }
     }

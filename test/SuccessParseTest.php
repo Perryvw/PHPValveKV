@@ -17,7 +17,7 @@ class SuccessParseTest extends \PHPUnit\Framework\TestCase
 	/**
 	 * @return array<array<string>>
 	 */
-	public function successFileProvider() : array
+	public static function successFileProvider() : array
 	{
 		return [
 			[ "vkv/comment_singleline.vdf" ],

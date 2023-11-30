@@ -1,15 +1,23 @@
 {
     "name": "perryvw/valvekv",
+    "description": "A parser for Valve's KeyValue serialization format. It can deal with most of the quirks of the Valve KV language such as conditionals, un-quoted keys or values, #base includes.",
+    "keywords": ["vdf", "valve", "keyvalue", "parser"],
     "type": "library",
     "license": "MIT",
     "autoload": {
         "psr-4": {"ValveKV\\": "src/"}
     },
+    "scripts": {
+        "test": [
+            "phpunit --fail-on-warning --coverage-text",
+            "phpstan analyse"
+        ]
+    },
     "require": {
-        "php": ">=7.4"
+        "php": ">=8.1"
     },
     "require-dev": {
-        "phpunit/phpunit": "^9.4",
-        "phpstan/phpstan": "^0.12.53"
+        "phpunit/phpunit": "^10.4",
+        "phpstan/phpstan": "^1.10"
     }
 }

@@ -19,7 +19,7 @@ class RobustnessTest extends \PHPUnit\Framework\TestCase
 	/**
 	 * @return array<array<string>>
 	 */
-	public function fileProvider() : array
+	public static function fileProvider() : array
 	{
 		return [
 			[ "robustness/nonexistingfile.kv", "Exception" ],
